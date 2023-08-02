@@ -196,17 +196,29 @@ import {AssertionError} from "assert";
             description: "Show timestamps and job duration in the logs",
             requiresArg: false,
         })
-        .option("maxJobNameLength", {
+        .option("max-job-name-length", {
             type: "number",
             description: "Maximum padding for job name (use <= 0 for no padding)",
             requiresArg: false,
         })
-        .completion("completion", false, async (_, yargsArgv) => {
+        .option("concurrency", {
+            type: "number",
+            description: "Limit the number of jobs that run simultaneously",
+            requiresArg: false,
+        })
+        .completion("completion", false, (current: string, yargsArgv: any, completionFilter: any, done: (completions: string[]) => any) => {
             try {
-                const argv = new Argv({...yargsArgv, autoCompleting: true});
-                const pipelineIid = await state.getPipelineIid(argv.cwd, argv.stateDir);
-                const parser = await Parser.create(argv, new WriteStreamsMock(), pipelineIid);
-                return [...parser.jobs.values()].filter((j) => j.when != "never").map((j) => j.name);
+                if (current.startsWith("-")) {
+                    completionFilter();
+                } else {
+                    const argv = new Argv({...yargsArgv, autoCompleting: true});
+                    state.getPipelineIid(argv.cwd, argv.stateDir).then((pipelineIid) => {
+                        Parser.create(argv, new WriteStreamsMock(), pipelineIid).then((parser) => {
+                            const jobNames = [...parser.jobs.values()].filter((j) => j.when != "never").map((j) => j.name);
+                            done(jobNames);
+                        });
+                    });
+                }
             } catch (e) {
                 return ["Parser-Failed!"];
             }
